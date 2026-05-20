@@ -56,6 +56,8 @@ export const makeStage = (name, years, cf, alloc) => ({
   years,
   cf,
   alloc: { ...alloc },
+  withdrawalMode: "fixed",
+  withdrawalRate: 4.0,
 });
 
 export const makeCrash = (year = 1, magnitude = -30, probability = 100, recoveryYears = 2) => ({

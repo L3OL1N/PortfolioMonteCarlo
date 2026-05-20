@@ -78,7 +78,7 @@ export default function App() {
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 14 }}>Simulation Settings</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
           <div>
             <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Initial Portfolio</div>
             <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 14, color: "#6b7280" }}>$</span>

@@ -61,7 +61,19 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
           }
 
           const totalAfter = assetValues.reduce((sum, value) => sum + value, 0);
-          const adjustedTotal = Math.max(0, totalAfter + stages[stIdx].cf);
+          let cashFlow = stages[stIdx].cf;
+          const withdrawalMode = stages[stIdx].withdrawalMode || "fixed";
+          if (stages[stIdx].cf < 0 && withdrawalMode === "dynamic") {
+            const baseWithdrawal = Math.abs(stages[stIdx].cf);
+            const withdrawalRate = stages[stIdx].withdrawalRate != null ? stages[stIdx].withdrawalRate : 4.0;
+            const currentTarget = totalAfter * (withdrawalRate / 100);
+            const minSpending = baseWithdrawal * 0.8;
+            const maxSpending = baseWithdrawal * 1.2;
+            let finalSpending = Math.max(minSpending, Math.min(maxSpending, currentTarget));
+            finalSpending = Math.min(totalAfter, finalSpending);
+            cashFlow = -finalSpending;
+          }
+          const adjustedTotal = Math.max(0, totalAfter + cashFlow);
           const currentWeights = totalAfter > 0 ? assetValues.map((value) => value / totalAfter) : weights;
           if (rebalance === "annual") {
             assetValues.forEach((_, idx) => {

@@ -13,6 +13,7 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
         const total = allocTotal(stage.alloc);
         const valid = total === 100;
         const isWithdrawal = stage.cf < 0;
+        const withdrawalMode = stage.withdrawalMode || "fixed";
         const color = PHASE_COLS[idx % PHASE_COLS.length];
 
         return (
@@ -32,6 +33,16 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
                 </div>
               </div>
               <div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Withdrawal Strategy</div>
+                <select value={withdrawalMode} onChange={(e) => updStage(stage.id, "withdrawalMode", e.target.value)} style={{ width: "100%", border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", cursor: "pointer" }}>
+                  <option value="fixed">Fixed</option>
+                  <option value="dynamic">Dynamic %</option>
+                </select>
+              </div>
+            </div>
+
+            {withdrawalMode === "fixed" && (
+              <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Annual Cash Flow
                   <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: isWithdrawal ? "#fee2e2" : "#dcfce7", color: isWithdrawal ? "#dc2626" : "#16a34a" }}>{isWithdrawal ? "WITHDRAWAL" : "CONTRIBUTION"}</span>
                 </div>
@@ -40,7 +51,17 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
                   <span style={{ fontSize: 11, color: "#9ca3af" }}>$/yr</span>
                 </div>
               </div>
-            </div>
+            )}
+
+            {withdrawalMode === "dynamic" && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Withdrawal Rate</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="number" value={stage.withdrawalRate ?? 4.0} step={0.1} min={0} max={20} onChange={(e) => updStage(stage.id, "withdrawalRate", Number(e.target.value))} style={{ width: "100%", border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111" }} />
+                  <span style={{ fontSize: 14, color: "#6b7280" }}>%</span>
+                </div>
+              </div>
+            )}
 
             <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
