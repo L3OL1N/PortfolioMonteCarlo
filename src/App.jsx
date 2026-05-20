@@ -18,6 +18,7 @@ export default function App() {
   ]);
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
   const [rebalance, setRebalance] = useState("annual");
+  const [distribution, setDistribution] = useState("normal");
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [seqOpen, setSeqOpen] = useState(true);
@@ -62,13 +63,13 @@ export default function App() {
           ...stage,
           alloc: Object.fromEntries(Object.entries(stage.alloc).map(([key, value]) => [key, Number(value) / 100])),
         }));
-        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk, rebalance));
+        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk, rebalance, distribution));
       } catch (error) {
         console.error(error);
       }
       setRunning(false);
     }, 20);
-  }, [stages, initial, numSims, inflation, seqRisk, running, allValid]);
+  }, [stages, initial, numSims, inflation, seqRisk, rebalance, distribution, running, allValid]);
 
   return (
     <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", maxWidth: 800, margin: "0 auto", padding: "24px 20px", color: "#111", background: "#f9fafb", minHeight: "100vh" }}>
@@ -77,7 +78,7 @@ export default function App() {
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 14 }}>Simulation Settings</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
           <div>
             <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Initial Portfolio</div>
             <div style={{ display: "flex", alignItems: "center" }}><span style={{ fontSize: 14, color: "#6b7280" }}>$</span>
@@ -93,6 +94,13 @@ export default function App() {
             <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Simulations</div>
             <select value={numSims} onChange={(e) => setNumSims(Number(e.target.value))} style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", cursor: "pointer", width: "100%" }}>
               {[500, 1000, 2500, 5000, 10000].map((option) => <option key={option} value={option}>{option.toLocaleString()}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Distribution</div>
+            <select value={distribution} onChange={(e) => setDistribution(e.target.value)} style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", cursor: "pointer", width: "100%" }}>
+              <option value="normal">Normal</option>
+              <option value="fat">Fat tails</option>
             </select>
           </div>
           <div>

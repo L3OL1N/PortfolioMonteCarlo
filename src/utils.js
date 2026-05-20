@@ -19,6 +19,16 @@ export function randn() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
+export function randStudentT(df = 4) {
+  const z = randn();
+  let sumSq = 0;
+  for (let i = 0; i < df; i++) {
+    const x = randn();
+    sumSq += x * x;
+  }
+  return z / Math.sqrt(sumSq / df);
+}
+
 export function portfolioMoments(weights) {
   let mu = 0;
   for (let i = 0; i < ASSETS.length; i++) mu += weights[i] * ASSETS[i].ret;

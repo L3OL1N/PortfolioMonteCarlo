@@ -1,7 +1,7 @@
 import { ASSETS, COR } from "./constants";
-import { cholesky, portfolioMoments, randn } from "./utils";
+import { cholesky, portfolioMoments, randn, randStudentT } from "./utils";
 
-export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance = "annual") {
+export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance = "annual", distribution = "normal") {
   const { autocorr, crashes } = seqRisk;
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
@@ -11,6 +11,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const assetMeans = ASSETS.map((a) => a.ret);
   const assetMeansReal = assetMeans.map((m) => (1 + m) / (1 + inflation) - 1);
   const numAssets = ASSETS.length;
+  const rng = distribution === "fat" ? randStudentT : randn;
 
   for (let sim = 0; sim < numSims; sim++) {
     let yi = 0;
@@ -50,7 +51,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
             });
             stagePrevShock[stIdx] = stagePrevShock[stIdx].map((s) => s * autocorr);
           } else {
-            const eps = Array.from({ length: numAssets }, randn);
+            const eps = Array.from({ length: numAssets }, rng);
             const correlated = assetChol.map((row) => row.reduce((sum, lij, j) => sum + lij * eps[j], 0));
             const nextShock = correlated.map((value, idx) => autocorr * stagePrevShock[stIdx][idx] + Math.sqrt(1 - autocorr * autocorr) * value);
             stagePrevShock[stIdx] = nextShock;
