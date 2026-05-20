@@ -1,5 +1,5 @@
 import { ASSETS, COR } from "./constants";
-import { portfolioMoments, randn } from "./utils";
+import { cholesky, portfolioMoments, randn } from "./utils";
 
 export function simulate(stages, initial, numSims, inflation, seqRisk) {
   const { autocorr, crashes } = seqRisk;
@@ -7,11 +7,16 @@ export function simulate(stages, initial, numSims, inflation, seqRisk) {
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
   const stageMoments = stages.map((st) => portfolioMoments(ASSETS.map((a) => st.alloc[a.key])));
 
+  const assetCov = ASSETS.map((a, i) => ASSETS.map((b, j) => a.std * b.std * COR[i][j]));
+  const assetChol = cholesky(assetCov);
+  const assetMeans = ASSETS.map((a) => a.ret);
+  const numAssets = ASSETS.length;
+
   for (let sim = 0; sim < numSims; sim++) {
     let val = initial;
     yearVals[0][sim] = val;
     let yi = 0;
-    let z_prev = 0;
+    const stagePrevShock = stages.map(() => new Array(numAssets).fill(0));
 
     const activeCrashes = {};
     const recoveryMap = {};
@@ -26,19 +31,23 @@ export function simulate(stages, initial, numSims, inflation, seqRisk) {
     }
 
     for (let stIdx = 0; stIdx < stages.length; stIdx++) {
-      const { mu, sigma } = stageMoments[stIdx];
+      const { mu } = stageMoments[stIdx];
       const muReal = (1 + mu) / (1 + inflation) - 1;
+      const weights = ASSETS.map((a) => stages[stIdx].alloc[a.key]);
       for (let y = 0; y < stages[stIdx].years; y++) {
         yi++;
         if (val > 0 || stages[stIdx].cf > 0) {
           let ret;
           if (activeCrashes[yi]) {
             ret = activeCrashes[yi].magnitude / 100;
-            z_prev = (ret - muReal) / Math.max(sigma, 0.001);
+            stagePrevShock[stIdx] = stagePrevShock[stIdx].map((s) => s * autocorr);
           } else {
-            const z_t = autocorr * z_prev + Math.sqrt(1 - autocorr * autocorr) * randn();
-            z_prev = z_t;
-            ret = muReal + sigma * z_t + (recoveryMap[yi] || 0);
+            const eps = Array.from({ length: numAssets }, randn);
+            const correlated = assetChol.map((row) => row.reduce((sum, lij, j) => sum + lij * eps[j], 0));
+            const nextShock = correlated.map((value, idx) => autocorr * stagePrevShock[stIdx][idx] + Math.sqrt(1 - autocorr * autocorr) * value);
+            stagePrevShock[stIdx] = nextShock;
+            const portfolioShock = nextShock.reduce((sum, shock, idx) => sum + shock * weights[idx], 0);
+            ret = muReal + portfolioShock + (recoveryMap[yi] || 0);
           }
           val = Math.max(0, val * (1 + ret) + stages[stIdx].cf);
         }
