@@ -11,12 +11,13 @@ const DEFAULT_ALLOC = { us: 50, cash: 10, allianztech: 20, gold: 10, farmland: 1
 export default function App() {
   const [initial, setInitial] = useState(10000000);
   const [inflation, setInflation] = useState(3.0);
-  const [numSims, setNumSims] = useState(5000);
+  const [numSims, setNumSims] = useState(10000);
   const [stages, setStages] = useState([
     makeStage("Now", 3, 720000, { us: 34, cash: 3, allianztech: 49, gold: 0, farmland: 14 }),
     makeStage("Retirement", 30, -480000, { us: 30, cash: 10, allianztech: 30, gold: 20, farmland: 10 }),
   ]);
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
+  const [rebalance, setRebalance] = useState("annual");
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [seqOpen, setSeqOpen] = useState(true);
@@ -61,7 +62,7 @@ export default function App() {
           ...stage,
           alloc: Object.fromEntries(Object.entries(stage.alloc).map(([key, value]) => [key, Number(value) / 100])),
         }));
-        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk));
+        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk, rebalance));
       } catch (error) {
         console.error(error);
       }
@@ -91,7 +92,14 @@ export default function App() {
           <div>
             <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Simulations</div>
             <select value={numSims} onChange={(e) => setNumSims(Number(e.target.value))} style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", cursor: "pointer", width: "100%" }}>
-              {[250, 500, 1000, 2500, 5000].map((option) => <option key={option} value={option}>{option.toLocaleString()}</option>)}
+              {[500, 1000, 2500, 5000, 10000].map((option) => <option key={option} value={option}>{option.toLocaleString()}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Rebalance</div>
+            <select value={rebalance} onChange={(e) => setRebalance(e.target.value)} style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", cursor: "pointer", width: "100%" }}>
+              <option value="annual">Annual</option>
+              <option value="none">None</option>
             </select>
           </div>
         </div>

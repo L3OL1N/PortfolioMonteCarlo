@@ -1,22 +1,22 @@
 import { ASSETS, COR } from "./constants";
 import { cholesky, portfolioMoments, randn } from "./utils";
 
-export function simulate(stages, initial, numSims, inflation, seqRisk) {
+export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance = "annual") {
   const { autocorr, crashes } = seqRisk;
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
-  const stageMoments = stages.map((st) => portfolioMoments(ASSETS.map((a) => st.alloc[a.key])));
 
   const assetCov = ASSETS.map((a, i) => ASSETS.map((b, j) => a.std * b.std * COR[i][j]));
   const assetChol = cholesky(assetCov);
   const assetMeans = ASSETS.map((a) => a.ret);
+  const assetMeansReal = assetMeans.map((m) => (1 + m) / (1 + inflation) - 1);
   const numAssets = ASSETS.length;
 
   for (let sim = 0; sim < numSims; sim++) {
-    let val = initial;
-    yearVals[0][sim] = val;
     let yi = 0;
     const stagePrevShock = stages.map(() => new Array(numAssets).fill(0));
+    const assetValues = ASSETS.map((asset) => initial * stages[0].alloc[asset.key]);
+    yearVals[0][sim] = initial;
 
     const activeCrashes = {};
     const recoveryMap = {};
@@ -31,27 +31,48 @@ export function simulate(stages, initial, numSims, inflation, seqRisk) {
     }
 
     for (let stIdx = 0; stIdx < stages.length; stIdx++) {
-      const { mu } = stageMoments[stIdx];
-      const muReal = (1 + mu) / (1 + inflation) - 1;
       const weights = ASSETS.map((a) => stages[stIdx].alloc[a.key]);
+      const totalBeforeStage = assetValues.reduce((sum, value) => sum + value, 0);
+      if (totalBeforeStage > 0) {
+        assetValues.forEach((_, idx) => {
+          assetValues[idx] = totalBeforeStage * weights[idx];
+        });
+      }
+
       for (let y = 0; y < stages[stIdx].years; y++) {
         yi++;
-        if (val > 0 || stages[stIdx].cf > 0) {
-          let ret;
+        const totalBefore = assetValues.reduce((sum, value) => sum + value, 0);
+        if (totalBefore > 0 || stages[stIdx].cf > 0) {
+          const recovery = recoveryMap[yi] || 0;
           if (activeCrashes[yi]) {
-            ret = activeCrashes[yi].magnitude / 100;
+            assetValues.forEach((_, idx) => {
+              assetValues[idx] *= 1 + activeCrashes[yi].magnitude / 100;
+            });
             stagePrevShock[stIdx] = stagePrevShock[stIdx].map((s) => s * autocorr);
           } else {
             const eps = Array.from({ length: numAssets }, randn);
             const correlated = assetChol.map((row) => row.reduce((sum, lij, j) => sum + lij * eps[j], 0));
             const nextShock = correlated.map((value, idx) => autocorr * stagePrevShock[stIdx][idx] + Math.sqrt(1 - autocorr * autocorr) * value);
             stagePrevShock[stIdx] = nextShock;
-            const portfolioShock = nextShock.reduce((sum, shock, idx) => sum + shock * weights[idx], 0);
-            ret = muReal + portfolioShock + (recoveryMap[yi] || 0);
+            assetValues.forEach((_, idx) => {
+              assetValues[idx] *= 1 + assetMeansReal[idx] + nextShock[idx] + recovery;
+            });
           }
-          val = Math.max(0, val * (1 + ret) + stages[stIdx].cf);
+
+          const totalAfter = assetValues.reduce((sum, value) => sum + value, 0);
+          const adjustedTotal = Math.max(0, totalAfter + stages[stIdx].cf);
+          const currentWeights = totalAfter > 0 ? assetValues.map((value) => value / totalAfter) : weights;
+          if (rebalance === "annual") {
+            assetValues.forEach((_, idx) => {
+              assetValues[idx] = adjustedTotal * weights[idx];
+            });
+          } else {
+            assetValues.forEach((_, idx) => {
+              assetValues[idx] = adjustedTotal * currentWeights[idx];
+            });
+          }
         }
-        yearVals[yi][sim] = val;
+        yearVals[yi][sim] = assetValues.reduce((sum, value) => sum + value, 0);
       }
     }
   }
