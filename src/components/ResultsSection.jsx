@@ -1,6 +1,26 @@
-import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from "recharts";
+import { ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from "recharts";
 import CustomTooltip from "./CustomTooltip";
 import { fmt } from "../utils";
+
+function WithdrawalTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+        <span>Yearly withdrawal</span>
+        <span style={{ fontWeight: 700 }}>{fmt(d.withdraw)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+        <span>Monthly amount</span>
+        <span style={{ fontWeight: 700 }}>{fmt(d.monthly)}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function ResultsSection({ results, seqRisk, stages }) {
   return (
@@ -56,6 +76,22 @@ export default function ResultsSection({ results, seqRisk, stages }) {
             <Line type="monotone" dataKey="p50" stroke="#1d4ed8" strokeWidth={2.5} dot={false} legendType="none" isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
+      </div>
+
+      <div style={{ marginTop: 24, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 }}>Withdrawal Schedule</div>
+        <div style={{ width: "100%", height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={results.withdrawalData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#9ca3af" }} label={{ value: "Year", position: "insideBottom", offset: -10, fontSize: 12, fill: "#9ca3af" }} />
+              <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
+              <Tooltip content={<WithdrawalTooltip />} />
+              {results.stageEnds.map((stageEnd) => <ReferenceLine key={`wd-${stageEnd.x}`} x={stageEnd.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
+              <Bar dataKey="withdraw" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginTop: 4 }}>

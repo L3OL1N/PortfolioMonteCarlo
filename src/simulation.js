@@ -5,6 +5,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const { autocorr, crashes } = seqRisk;
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
+  const withdrawalSums = Array(totalYears + 1).fill(0);
 
   const assetCov = ASSETS.map((a, i) => ASSETS.map((b, j) => a.std * b.std * COR[i][j]));
   const assetChol = cholesky(assetCov);
@@ -74,6 +75,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
             cashFlow = -finalSpending;
           }
           const adjustedTotal = Math.max(0, totalAfter + cashFlow);
+          withdrawalSums[yi] += Math.max(0, -cashFlow);
           const currentWeights = totalAfter > 0 ? assetValues.map((value) => value / totalAfter) : weights;
           if (rebalance === "annual") {
             assetValues.forEach((_, idx) => {
@@ -108,6 +110,12 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     };
   });
 
+  const withdrawalData = withdrawalSums.slice(1).map((sum, index) => ({
+    year: index + 1,
+    withdraw: Math.round(sum / numSims),
+    monthly: Math.round(sum / numSims / 12),
+  }));
+
   const stageEnds = [];
   let cum = 0;
   for (let i = 0; i < stages.length - 1; i++) {
@@ -128,6 +136,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
 
   return {
     chartData,
+    withdrawalData,
     stageEnds,
     success: ((yearVals[totalYears].filter((v) => v > 0).length / numSims) * 100).toFixed(1),
     ruinRate: ((ruinCount / numSims) * 100).toFixed(1),
