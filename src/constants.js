@@ -1,9 +1,9 @@
 export const ASSETS = [
   { key: "us",          label: "US Stocks",       ret: 0.100, std: 0.170, color: "#2563eb" },
-  { key: "cash",        label: "Cash",             ret: 0.020, std: 0.010, color: "#6b7280" },
   { key: "allianztech", label: "安聯台灣科技基金",  ret: 0.200, std: 0.380, color: "#7c3aed" },
-  { key: "gold",        label: "黃金",              ret: 0.060, std: 0.160, color: "#ca8a04" },
   { key: "farmland",    label: "農地",              ret: 0.070, std: 0.080, color: "#15803d" },
+  { key: "gold",        label: "黃金",              ret: 0.060, std: 0.160, color: "#95890a" },
+  { key: "cash",        label: "Cash",             ret: 0.020, std: 0.010, color: "#6b7280" },
 ];
 
 export const COR = [
