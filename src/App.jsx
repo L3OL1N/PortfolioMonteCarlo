@@ -6,15 +6,15 @@ import SequenceRiskPanel from "./components/SequenceRiskPanel";
 import PhaseSection from "./components/PhaseSection";
 import ResultsSection from "./components/ResultsSection";
 
-const DEFAULT_ALLOC = { us: 50, cash: 10, allianztech: 20, gold: 10, farmland: 10 };
+const DEFAULT_ALLOC = { us: 40, bond: 10, cash: 10, allianztech: 20, gold: 10, farmland: 10 };
 
 export default function App() {
   const [initial, setInitial] = useState(10000000);
   const [inflation, setInflation] = useState(3.0);
   const [numSims, setNumSims] = useState(10000);
   const [stages, setStages] = useState([
-    makeStage("Now", 3, 720000, { us: 34, cash: 3, allianztech: 49, gold: 0, farmland: 14 }, { us: 350, allianztech: 500, farmland: 140, gold: 0, cash: 70 }),
-    makeStage("Retirement", 30, -480000, { us: 30, cash: 10, allianztech: 30, gold: 20, farmland: 10 }),
+    makeStage("Now", 3, 720000, { us: 34, bond: 0, cash: 3, allianztech: 49, gold: 0, farmland: 14 }, { us: 350, bond: 0, allianztech: 500, farmland: 140, gold: 0, cash: 70 }),
+    makeStage("Retirement", 30, -480000, { us: 30, bond: 0, cash: 10, allianztech: 30, gold: 20, farmland: 10 }),
   ]);
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
   const [rebalance, setRebalance] = useState("annual");
