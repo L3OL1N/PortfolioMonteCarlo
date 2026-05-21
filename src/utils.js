@@ -50,12 +50,28 @@ export const fmt = (v) => {
 
 export const allocTotal = (alloc) => ASSETS.reduce((sum, asset) => sum + Number(alloc[asset.key] || 0), 0);
 
-export const makeStage = (name, years, cf, alloc) => ({
+export const allocAmountTotal = (allocAmount) => ASSETS.reduce((sum, asset) => sum + Number(allocAmount?.[asset.key] || 0), 0);
+
+export const computeAllocFromAmounts = (allocAmount) => {
+  const total = allocAmountTotal(allocAmount);
+  if (total === 0) return Object.fromEntries(ASSETS.map((asset) => [asset.key, 0]));
+  let sum = 0;
+  const normalized = {};
+  ASSETS.forEach((asset, index) => {
+    normalized[asset.key] = index < ASSETS.length - 1 ? Math.round((Number(allocAmount[asset.key] || 0) / total) * 100) : 0;
+    sum += normalized[asset.key];
+  });
+  normalized[ASSETS[ASSETS.length - 1].key] = 100 - sum;
+  return normalized;
+};
+
+export const makeStage = (name, years, cf, alloc, allocAmount) => ({
   id: Math.random().toString(36).slice(2),
   name,
   years,
   cf,
   alloc: { ...alloc },
+  allocAmount: allocAmount ? { ...allocAmount } : Object.fromEntries(ASSETS.map((asset) => [asset.key, 0])),
   withdrawalMode: "fixed",
   withdrawalRate: 4.0,
 });

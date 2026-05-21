@@ -1,7 +1,7 @@
 import { ASSETS, PHASE_COLS } from "../constants";
-import { allocTotal } from "../utils";
+import { allocTotal, allocAmountTotal } from "../utils";
 
-export default function PhaseSection({ stages, addStage, removeStage, updStage, updAlloc, normalizeAlloc }) {
+export default function PhaseSection({ stages, addStage, removeStage, updStage, updAlloc, updAllocAmount, normalizeAlloc }) {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -12,6 +12,7 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
       {stages.map((stage, idx) => {
         const total = allocTotal(stage.alloc);
         const valid = total === 100;
+        const amountTotal = allocAmountTotal(stage.allocAmount);
         const isWithdrawal = stage.cf < 0;
         const withdrawalMode = stage.withdrawalMode || "fixed";
         const color = PHASE_COLS[idx % PHASE_COLS.length];
@@ -72,7 +73,7 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
                 </div>
               </div>
               {ASSETS.map((asset) => (
-                <div key={asset.key} style={{ display: "grid", gridTemplateColumns: "96px 1fr 56px", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <div key={asset.key} style={{ display: "grid", gridTemplateColumns: "96px 1fr 50px 50px", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                     <span style={{ width: 9, height: 9, borderRadius: 3, background: asset.color, display: "inline-block", flexShrink: 0 }} />{asset.label}
                   </span>
@@ -81,8 +82,16 @@ export default function PhaseSection({ stages, addStage, removeStage, updStage, 
                     <input type="number" min={0} max={100} step={1} value={stage.alloc[asset.key]} onChange={(e) => updAlloc(stage.id, asset.key, e.target.value)} style={{ width: 40, fontSize: 13, fontWeight: 700, textAlign: "right" }} />
                     <span style={{ fontSize: 12, color: "#9ca3af" }}>%</span>
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <input type="number" min={0} value={stage.allocAmount?.[asset.key] ?? 0} onChange={(e) => updAllocAmount(stage.id, asset.key, e.target.value)} style={{ width: 48, fontSize: 13, fontWeight: 700, textAlign: "right" }} />
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>$</span>
+                  </div>
                 </div>
               ))}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, paddingTop: 8, borderTop: "1px solid #f3f4f6" }}>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>Total asset amount</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>${amountTotal.toLocaleString()}</span>
+              </div>
               <div style={{ display: "flex", height: 8, borderRadius: 6, overflow: "hidden", marginTop: 6 }}>
                 {ASSETS.filter((asset) => stage.alloc[asset.key] > 0).map((asset) => (
                   <div key={asset.key} style={{ flex: stage.alloc[asset.key], background: asset.color, transition: "flex .2s" }} />

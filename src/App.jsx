@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { ASSETS, PRESETS } from "./constants";
-import { makeStage, makeCrash, allocTotal } from "./utils";
+import { makeStage, makeCrash, allocTotal, allocAmountTotal, computeAllocFromAmounts } from "./utils";
 import { simulate } from "./simulation";
 import SequenceRiskPanel from "./components/SequenceRiskPanel";
 import PhaseSection from "./components/PhaseSection";
@@ -13,7 +13,7 @@ export default function App() {
   const [inflation, setInflation] = useState(3.0);
   const [numSims, setNumSims] = useState(10000);
   const [stages, setStages] = useState([
-    makeStage("Now", 3, 720000, { us: 34, cash: 3, allianztech: 49, gold: 0, farmland: 14 }),
+    makeStage("Now", 3, 720000, { us: 34, cash: 3, allianztech: 49, gold: 0, farmland: 14 }, { us: 350, allianztech: 500, farmland: 140, gold: 0, cash: 70 }),
     makeStage("Retirement", 30, -480000, { us: 30, cash: 10, allianztech: 30, gold: 20, farmland: 10 }),
   ]);
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
@@ -26,7 +26,23 @@ export default function App() {
   const addStage = () => setStages((prev) => [...prev, makeStage(`Phase ${prev.length + 1}`, 10, 0, DEFAULT_ALLOC)]);
   const removeStage = (id) => setStages((prev) => (prev.length > 1 ? prev.filter((stage) => stage.id !== id) : prev));
   const updStage = (id, key, value) => setStages((prev) => prev.map((stage) => (stage.id === id ? { ...stage, [key]: value } : stage)));
-  const updAlloc = (id, asset, value) => setStages((prev) => prev.map((stage) => (stage.id === id ? { ...stage, alloc: { ...stage.alloc, [asset]: Math.max(0, Math.min(100, Number(value))) } } : stage)));
+  const updAlloc = (id, asset, value) => setStages((prev) => prev.map((stage) => {
+    if (stage.id !== id) return stage;
+    const nextAlloc = { ...stage.alloc, [asset]: Math.max(0, Math.min(100, Number(value))) };
+    const amountTotal = allocAmountTotal(stage.allocAmount);
+    if (amountTotal > 0) {
+      const nextAllocAmount = Object.fromEntries(ASSETS.map(({ key }) => [key, Math.round((nextAlloc[key] / 100) * amountTotal)]));
+      return { ...stage, alloc: nextAlloc, allocAmount: nextAllocAmount };
+    }
+    return { ...stage, alloc: nextAlloc };
+  }));
+  const updAllocAmount = (id, asset, value) => setStages((prev) => prev.map((stage) => {
+    if (stage.id !== id) return stage;
+    const nextAllocAmount = { ...stage.allocAmount, [asset]: Math.max(0, Number(value) || 0) };
+    const totalAmount = allocAmountTotal(nextAllocAmount);
+    if (totalAmount === 0) return { ...stage, allocAmount: nextAllocAmount };
+    return { ...stage, allocAmount: nextAllocAmount, alloc: computeAllocFromAmounts(nextAllocAmount) };
+  }));
   const normalizeAlloc = (id) => setStages((prev) => prev.map((stage) => {
     if (stage.id !== id) return stage;
     const total = allocTotal(stage.alloc);
@@ -39,6 +55,14 @@ export default function App() {
       sum += normalized[key];
     });
     normalized[keys[keys.length - 1]] = 100 - sum;
+    const amountTotal = allocAmountTotal(stage.allocAmount);
+    if (amountTotal > 0) {
+      const normalizedAmounts = {};
+      keys.forEach((key) => {
+        normalizedAmounts[key] = Math.round((normalized[key] / 100) * amountTotal);
+      });
+      return { ...stage, alloc: normalized, allocAmount: normalizedAmounts };
+    }
     return { ...stage, alloc: normalized };
   }));
 
@@ -141,6 +165,7 @@ export default function App() {
         removeStage={removeStage}
         updStage={updStage}
         updAlloc={updAlloc}
+        updAllocAmount={updAllocAmount}
         normalizeAlloc={normalizeAlloc}
       />
 

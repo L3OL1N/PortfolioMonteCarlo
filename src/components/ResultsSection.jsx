@@ -78,6 +78,14 @@ export default function ResultsSection({ results, seqRisk, stages }) {
         </ResponsiveContainer>
       </div>
 
+      <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginTop: 4, paddingLeft: 80 }}>
+        {stages.map((stage, index) => (
+          <div key={stage.id} style={{ flex: stage.years, background: `#${["2563eb","16a34a","d97706","db2777","7c3aed","0891b2"][index % 6]}cc`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            <span style={{ fontSize: 10, color: "white", whiteSpace: "nowrap", padding: "0 4px", fontWeight: 700 }}>{stage.name}</span>
+          </div>
+        ))}
+      </div>
+
       <div style={{ marginTop: 24, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px" }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 }}>Withdrawal Schedule</div>
         <div style={{ width: "100%", height: 260 }}>
@@ -92,14 +100,6 @@ export default function ResultsSection({ results, seqRisk, stages }) {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginTop: 4 }}>
-        {stages.map((stage, index) => (
-          <div key={stage.id} style={{ flex: stage.years, background: `#${["2563eb","16a34a","d97706","db2777","7c3aed","0891b2"][index % 6]}cc`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            <span style={{ fontSize: 10, color: "white", whiteSpace: "nowrap", padding: "0 4px", fontWeight: 700 }}>{stage.name}</span>
-          </div>
-        ))}
       </div>
 
       {(seqRisk.autocorr > 0 || seqRisk.crashes.length > 0) && (
