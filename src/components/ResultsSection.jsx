@@ -1,4 +1,5 @@
 import { ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from "recharts";
+import { ASSETS } from "../constants";
 import CustomTooltip from "./CustomTooltip";
 import { fmt } from "../utils";
 
@@ -23,6 +24,28 @@ function WithdrawalTooltip({ active, payload }) {
 }
 
 export default function ResultsSection({ results, seqRisk, stages }) {
+  const year3Totals = results.year3AssetSummary ? ASSETS.reduce((totals, asset) => {
+    const summary = results.year3AssetSummary[asset.key];
+    if (!summary) return totals;
+    return {
+      p10: totals.p10 + summary.p10,
+      p50: totals.p50 + summary.p50,
+      p75: totals.p75 + summary.p75,
+      p90: totals.p90 + summary.p90,
+    };
+  }, { p10: 0, p50: 0, p75: 0, p90: 0 }) : null;
+
+  const finalTotals = results.finalAssetSummary ? ASSETS.reduce((totals, asset) => {
+    const summary = results.finalAssetSummary[asset.key];
+    if (!summary) return totals;
+    return {
+      p10: totals.p10 + summary.p10,
+      p50: totals.p50 + summary.p50,
+      p75: totals.p75 + summary.p75,
+      p90: totals.p90 + summary.p90,
+    };
+  }, { p10: 0, p50: 0, p75: 0, p90: 0 }) : null;
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 20px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 16 }}>Simulation Results — Final Portfolio Value</div>
@@ -78,7 +101,7 @@ export default function ResultsSection({ results, seqRisk, stages }) {
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginTop: 4, paddingLeft: 80 }}>
+      <div style={{ display: "flex", height: 22, borderRadius: 6, overflow: "hidden", marginTop: 4, marginRight: 8, marginLeft: 80   }}>
         {stages.map((stage, index) => (
           <div key={stage.id} style={{ flex: stage.years, background: `#${["2563eb","16a34a","d97706","db2777","7c3aed","0891b2"][index % 6]}cc`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
             <span style={{ fontSize: 10, color: "white", whiteSpace: "nowrap", padding: "0 4px", fontWeight: 700 }}>{stage.name}</span>
@@ -110,6 +133,118 @@ export default function ResultsSection({ results, seqRisk, stages }) {
           {seqRisk.crashes.filter((crash) => crash.probability < 100 && crash.probability >= 5).length > 0 && `Probabilistic crashes split simulations into "hit" vs "miss" groups, visibly widening the fan at the crash year.`}
         </div>
       )}
+
+      <div style={{ marginTop: 22, border: "1px solid #e5e7eb", background: "#f8fafc", borderRadius: 12, padding: "18px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 }}>Year 3 Asset Breakdown</div>
+        {results.year3AssetSummary ? (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "10px 8px", color: "#6b7280" }}>Asset</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P10</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P10 %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>Median</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>Median %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P75</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P75 %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P90</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P90 %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ASSETS.map((asset) => {
+                  const summary = results.year3AssetSummary[asset.key];
+                  return (
+                    <tr key={asset.key} style={{ borderTop: "1px solid #e5e7eb" }}>
+                      <td style={{ padding: "10px 8px", fontWeight: 700, color: "#111" }}>{asset.label}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p10)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct10 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p50)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct50 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p75)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct75 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p90)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct90 * 100).toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+                {year3Totals && (
+                  <tr style={{ borderTop: "2px solid #d1d5db", background: "#eef2ff" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 700, color: "#111" }}>Total</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(year3Totals.p10)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(year3Totals.p50)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(year3Totals.p75)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(year3Totals.p90)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: "#6b7280", fontSize: 12 }}>Year 3 asset data is not available because the simulation horizon is less than 3 years.</div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 22, border: "1px solid #e5e7eb", background: "#f8fafc", borderRadius: 12, padding: "18px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 }}>Final Year Asset Breakdown</div>
+        {results.finalAssetSummary ? (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "10px 8px", color: "#6b7280" }}>Asset</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P10</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P10 %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>Median</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>Median %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P75</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P75 %</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P90</th>
+                  <th style={{ textAlign: "right", padding: "10px 8px", color: "#6b7280" }}>P90 %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ASSETS.map((asset) => {
+                  const summary = results.finalAssetSummary[asset.key];
+                  return (
+                    <tr key={asset.key} style={{ borderTop: "1px solid #e5e7eb" }}>
+                      <td style={{ padding: "10px 8px", fontWeight: 700, color: "#111" }}>{asset.label}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p10)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct10 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p50)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct50 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p75)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct75 * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right" }}>{fmt(summary.p90)}</td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280" }}>{(summary.pct90 * 100).toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+                {finalTotals && (
+                  <tr style={{ borderTop: "2px solid #d1d5db", background: "#eef2ff" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 700, color: "#111" }}>Total</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(finalTotals.p10)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(finalTotals.p50)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(finalTotals.p75)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700 }}>{fmt(finalTotals.p90)}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "right", color: "#6b7280", fontWeight: 700 }}>100.0%</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ color: "#6b7280", fontSize: 12 }}>Final year asset data is not available because the simulation horizon is zero.</div>
+        )}
+      </div>
     </div>
   );
 }

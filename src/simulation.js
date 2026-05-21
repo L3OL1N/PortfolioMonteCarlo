@@ -6,6 +6,10 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
   const withdrawalSums = Array(totalYears + 1).fill(0);
+  const year3AssetValues = Array.from({ length: ASSETS.length }, () => []);
+  const year3AssetShares = Array.from({ length: ASSETS.length }, () => []);
+  const finalAssetValues = Array.from({ length: ASSETS.length }, () => []);
+  const finalAssetShares = Array.from({ length: ASSETS.length }, () => []);
 
   const assetCov = ASSETS.map((a, i) => ASSETS.map((b, j) => a.std * b.std * COR[i][j]));
   const assetChol = cholesky(assetCov);
@@ -87,6 +91,23 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
             });
           }
         }
+
+        if (yi === 3) {
+          const totalYear3 = assetValues.reduce((sum, value) => sum + value, 0);
+          assetValues.forEach((value, idx) => {
+            year3AssetValues[idx].push(value);
+            year3AssetShares[idx].push(totalYear3 > 0 ? value / totalYear3 : 0);
+          });
+        }
+
+        if (yi === totalYears) {
+          const totalFinal = assetValues.reduce((sum, value) => sum + value, 0);
+          assetValues.forEach((value, idx) => {
+            finalAssetValues[idx].push(value);
+            finalAssetShares[idx].push(totalFinal > 0 ? value / totalFinal : 0);
+          });
+        }
+
         yearVals[yi][sim] = assetValues.reduce((sum, value) => sum + value, 0);
       }
     }
@@ -134,10 +155,46 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     }
   }
 
+  const year3AssetSummary = totalYears >= 3 ? ASSETS.reduce((acc, asset, idx) => {
+    const values = [...year3AssetValues[idx]].sort((a, b) => a - b);
+    const shares = [...year3AssetShares[idx]].sort((a, b) => a - b);
+    acc[asset.key] = {
+      label: asset.label,
+      p10: pct(values, 0.10),
+      p50: pct(values, 0.50),
+      p75: pct(values, 0.75),
+      p90: pct(values, 0.90),
+      pct10: pct(shares, 0.10),
+      pct50: pct(shares, 0.50),
+      pct75: pct(shares, 0.75),
+      pct90: pct(shares, 0.90),
+    };
+    return acc;
+  }, {}) : null;
+
+  const finalAssetSummary = totalYears >= 1 ? ASSETS.reduce((acc, asset, idx) => {
+    const values = [...finalAssetValues[idx]].sort((a, b) => a - b);
+    const shares = [...finalAssetShares[idx]].sort((a, b) => a - b);
+    acc[asset.key] = {
+      label: asset.label,
+      p10: pct(values, 0.10),
+      p50: pct(values, 0.50),
+      p75: pct(values, 0.75),
+      p90: pct(values, 0.90),
+      pct10: pct(shares, 0.10),
+      pct50: pct(shares, 0.50),
+      pct75: pct(shares, 0.75),
+      pct90: pct(shares, 0.90),
+    };
+    return acc;
+  }, {}) : null;
+
   return {
     chartData,
     withdrawalData,
     stageEnds,
+    year3AssetSummary,
+    finalAssetSummary,
     success: ((yearVals[totalYears].filter((v) => v > 0).length / numSims) * 100).toFixed(1),
     ruinRate: ((ruinCount / numSims) * 100).toFixed(1),
     p10: pct(finalSorted, 0.10),
