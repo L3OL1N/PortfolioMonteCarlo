@@ -245,6 +245,41 @@ export default function ResultsSection({ results, seqRisk, stages }) {
           <div style={{ color: "#6b7280", fontSize: 12 }}>Final year asset data is not available because the simulation horizon is zero.</div>
         )}
       </div>
+
+      <div style={{ marginTop: 22, border: "1px solid #e5e7eb", background: "#f8fafc", borderRadius: 12, padding: "18px" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 }}>Yearly Asset P50 Median Values</div>
+        <div style={{ width: "100%", height: 320 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={results.yearlyAssetP50Data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#9ca3af" }} label={{ value: "Year", position: "insideBottom", offset: -10, fontSize: 12, fill: "#9ca3af" }} />
+              <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
+              <Tooltip formatter={(value) => fmt(value)} contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8 }} />
+              {results.stageEnds.map((stageEnd) => <ReferenceLine key={`asset-${stageEnd.x}`} x={stageEnd.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
+              {ASSETS.map((asset, idx) => (
+                <Line
+                  key={asset.key}
+                  type="monotone"
+                  dataKey={asset.key}
+                  stroke={`#${["2563eb", "7c3aed", "15803d", "95890a", "6b7280", "ef4444"][idx % 6]}`}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                  name={asset.label}
+                />
+              ))}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12, fontSize: 12, color: "#6b7280" }}>
+          {ASSETS.map((asset, idx) => (
+            <span key={asset.key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 18, height: 2.5, background: `#${["2563eb", "16a34a", "d97706", "db2777", "7c3aed", "0891b2"][idx % 6]}`, display: "inline-block", borderRadius: 2 }} />
+              {asset.label}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

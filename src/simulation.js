@@ -17,6 +17,9 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const assetMeansReal = assetMeans.map((m) => (1 + m) / (1 + inflation) - 1);
   const numAssets = ASSETS.length;
   const rng = distribution === "fat" ? randStudentT : randn;
+  const yearlyAssetValues = Array.from({ length: totalYears + 1 }, () => 
+    Array.from({ length: numAssets }, () => [])
+  );
 
   for (let sim = 0; sim < numSims; sim++) {
     let yi = 0;
@@ -109,6 +112,11 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
         }
 
         yearVals[yi][sim] = assetValues.reduce((sum, value) => sum + value, 0);
+        
+        // Collect yearly asset values for line chart
+        assetValues.forEach((value, idx) => {
+          yearlyAssetValues[yi][idx].push(value);
+        });
       }
     }
   }
@@ -189,12 +197,23 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     return acc;
   }, {}) : null;
 
+  // Calculate yearly asset p50 data for line chart
+  const yearlyAssetP50Data = Array.from({ length: totalYears + 1 }, (_, year) => {
+    const dataPoint = { year };
+    ASSETS.forEach((asset, idx) => {
+      const values = [...yearlyAssetValues[year][idx]].sort((a, b) => a - b);
+      dataPoint[asset.key] = Math.round(pct(values, 0.50));
+    });
+    return dataPoint;
+  });
+
   return {
     chartData,
     withdrawalData,
     stageEnds,
     year3AssetSummary,
     finalAssetSummary,
+    yearlyAssetP50Data,
     success: ((yearVals[totalYears].filter((v) => v > 0).length / numSims) * 100).toFixed(1),
     ruinRate: ((ruinCount / numSims) * 100).toFixed(1),
     p10: pct(finalSorted, 0.10),
