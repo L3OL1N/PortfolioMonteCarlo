@@ -20,7 +20,7 @@ export default function App() {
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
   const [rebalance, setRebalance] = useState("annual");
   const [distribution, setDistribution] = useState("normal");
-  const [emergencyFund, setEmergencyFund] = useState({ enabled: false, years: 3, bearThreshold: -10 });
+  const [emergencyFund, setEmergencyFund] = useState({ enabled: false, mode: 'bear_shield', years: 3, bearThreshold: -10, contributionRate: 4, floorPct: 5 });
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [seqOpen, setSeqOpen] = useState(true);
@@ -176,31 +176,92 @@ export default function App() {
           </label>
         </div>
         {emergencyFund.enabled && (
-          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Reserve Years</div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <input type="number" value={emergencyFund.years} step={1} min={1} max={10}
-                  onChange={(e) => setEmergencyFund((prev) => ({ ...prev, years: Math.max(1, Math.min(10, Number(e.target.value))) }))}
-                  style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
-                <span style={{ fontSize: 14, color: "#6b7280" }}>yrs</span>
+          <>
+            <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { id: 'bear_shield', label: 'Bear Shield', desc: 'Use reserve only during bear markets · replenishes in bull years' },
+                { id: 'water_tank', label: 'Water Tank (水塔)', desc: 'Annual portfolio contribution → tank → spend tank ÷ years with floor' },
+              ].map(({ id, label, desc }) => (
+                <label key={id} style={{ display: "flex", gap: 8, cursor: "pointer", padding: "8px 12px", border: `1.5px solid ${emergencyFund.mode === id ? '#1d4ed8' : '#e5e7eb'}`, borderRadius: 8, background: emergencyFund.mode === id ? '#eff6ff' : '#f9fafb', userSelect: "none" }}>
+                  <input type="radio" name="ef-mode" value={id} checked={emergencyFund.mode === id} onChange={() => setEmergencyFund(prev => ({ ...prev, mode: id }))} style={{ marginTop: 2, cursor: "pointer" }} />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{label}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {emergencyFund.mode === 'bear_shield' && (
+              <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Reserve Years</div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" value={emergencyFund.years} step={1} min={1} max={10}
+                      onChange={(e) => setEmergencyFund((prev) => ({ ...prev, years: Math.max(1, Math.min(10, Number(e.target.value))) }))}
+                      style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                    <span style={{ fontSize: 14, color: "#6b7280" }}>yrs</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Bear Market Threshold</div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" value={emergencyFund.bearThreshold} step={1} min={-30} max={-1}
+                      onChange={(e) => setEmergencyFund((prev) => ({ ...prev, bearThreshold: Math.max(-30, Math.min(-1, Number(e.target.value))) }))}
+                      style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                    <span style={{ fontSize: 14, color: "#6b7280" }}>%</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Initial Fund Size</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>{fmt(emergencyFundInitial)}</div>
+                  <div style={{ fontSize: 10, color: "#9ca3af" }}>{emergencyFund.years} yrs × {fmt(maxWithdrawalCf)}/yr</div>
+                </div>
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Bear Market Threshold</div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <input type="number" value={emergencyFund.bearThreshold} step={1} min={-30} max={-1}
-                  onChange={(e) => setEmergencyFund((prev) => ({ ...prev, bearThreshold: Math.max(-30, Math.min(-1, Number(e.target.value))) }))}
-                  style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
-                <span style={{ fontSize: 14, color: "#6b7280" }}>%</span>
+            )}
+
+            {emergencyFund.mode === 'water_tank' && (
+              <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Tank Size</div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" value={emergencyFund.years} step={1} min={1} max={10}
+                      onChange={(e) => setEmergencyFund((prev) => ({ ...prev, years: Math.max(1, Math.min(10, Number(e.target.value))) }))}
+                      style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                    <span style={{ fontSize: 14, color: "#6b7280" }}>yrs</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Annual Contribution</div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" value={emergencyFund.contributionRate} step={0.5} min={1} max={10}
+                      onChange={(e) => setEmergencyFund((prev) => ({ ...prev, contributionRate: Math.max(1, Math.min(10, Number(e.target.value))) }))}
+                      style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                    <span style={{ fontSize: 14, color: "#6b7280" }}>%/yr</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Spending Floor</div>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <input type="number" value={emergencyFund.floorPct} step={1} min={1} max={20}
+                      onChange={(e) => setEmergencyFund((prev) => ({ ...prev, floorPct: Math.max(1, Math.min(20, Number(e.target.value))) }))}
+                      style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                    <span style={{ fontSize: 14, color: "#6b7280" }}>% max cut/yr</span>
+                  </div>
+                </div>
+                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 20, alignItems: "flex-start", paddingTop: 4, borderTop: "1px solid #f0fdf4" }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>Initial Tank</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>{fmt(emergencyFundInitial)}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{emergencyFund.years} yrs × {fmt(maxWithdrawalCf)}/yr</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.7, marginTop: 2 }}>
+                    Portfolio adds <strong>{emergencyFund.contributionRate}%</strong> to tank each year · spending = tank ÷ {emergencyFund.years} · if market crashes, spending drops at most <strong>{emergencyFund.floorPct}%/yr</strong>, smoothing the impact over ~{Math.ceil(100 / emergencyFund.floorPct)} years
+                  </div>
+                </div>
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Initial Fund Size</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>{fmt(emergencyFundInitial)}</div>
-              <div style={{ fontSize: 10, color: "#9ca3af" }}>{emergencyFund.years} yrs × {fmt(maxWithdrawalCf)}/yr</div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 

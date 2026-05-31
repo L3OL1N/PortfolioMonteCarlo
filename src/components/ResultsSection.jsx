@@ -3,26 +3,31 @@ import { ASSETS } from "../constants";
 import CustomTooltip from "./CustomTooltip";
 import { fmt } from "../utils";
 
-function WithdrawalTooltip({ active, payload }) {
+function WithdrawalTooltip({ active, payload, mode }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
-  const hasEF = d.efWithdraw > 0;
+  const isWaterTank = mode === 'water_tank';
+  const hasPortfolio = d.withdraw > 0;
+  const hasTank = d.efWithdraw > 0;
+  const showSplit = hasPortfolio && hasTank;
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
-        <span>Portfolio withdrawal</span>
-        <span style={{ fontWeight: 700 }}>{fmt(d.withdraw)}</span>
-      </div>
-      {hasEF && (
+      {hasPortfolio && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+          <span>Portfolio withdrawal</span>
+          <span style={{ fontWeight: 700 }}>{fmt(d.withdraw)}</span>
+        </div>
+      )}
+      {hasTank && (
         <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8, color: "#15803d" }}>
-          <span>From emergency fund</span>
+          <span>{isWaterTank ? 'From water tank' : 'From emergency fund'}</span>
           <span style={{ fontWeight: 700 }}>{fmt(d.efWithdraw)}</span>
         </div>
       )}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8, borderTop: hasEF ? "1px solid #e5e7eb" : "none", paddingTop: hasEF ? 4 : 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8, borderTop: showSplit ? "1px solid #e5e7eb" : "none", paddingTop: showSplit ? 4 : 0 }}>
         <span>Monthly total</span>
         <span style={{ fontWeight: 700 }}>{fmt(d.monthly)}</span>
       </div>
@@ -30,13 +35,13 @@ function WithdrawalTooltip({ active, payload }) {
   );
 }
 
-function EFTooltip({ active, payload }) {
+function EFTooltip({ active, payload, mode }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
-      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year} — Emergency Fund</div>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year} — {mode === 'water_tank' ? 'Water Tank' : 'Emergency Fund'}</div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
         <span>P10 (worst)</span><span style={{ fontWeight: 700, color: "#dc2626" }}>{fmt(d.p10)}</span>
       </div>
@@ -144,7 +149,7 @@ export default function ResultsSection({ results, seqRisk, stages }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#9ca3af" }} label={{ value: "Year", position: "insideBottom", offset: -10, fontSize: 12, fill: "#9ca3af" }} />
               <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
-              <Tooltip content={<WithdrawalTooltip />} />
+              <Tooltip content={<WithdrawalTooltip mode={results.emergencyFundMode} />} />
               {results.stageEnds.map((stageEnd) => <ReferenceLine key={`wd-${stageEnd.x}`} x={stageEnd.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
               <Bar dataKey="efWithdraw" stackId="w" fill="#16a34a" radius={[0, 0, 0, 0]} name="Emergency Fund" />
               <Bar dataKey="withdraw" stackId="w" fill="#1d4ed8" radius={[8, 8, 0, 0]} name="Portfolio" />
@@ -155,9 +160,13 @@ export default function ResultsSection({ results, seqRisk, stages }) {
 
       {results.emergencyFundData && (
         <div style={{ marginTop: 22, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "18px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Emergency Fund Balance (緊急預備金)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>
+            {results.emergencyFundMode === 'water_tank' ? 'Water Tank Balance (水塔)' : 'Emergency Fund Balance (緊急預備金)'}
+          </div>
           <div style={{ fontSize: 12, color: "#16a34a", marginBottom: 12 }}>
-            Initial reserve: {fmt(results.emergencyFundInitial)} · Used during bear markets, replenished during bull years
+            {results.emergencyFundMode === 'water_tank'
+              ? `Initial tank: ${fmt(results.emergencyFundInitial)} · Receives ${results.emergencyFundContribRate}% of portfolio each year · spending = tank ÷ years · max ${results.emergencyFundFloorPct}% annual spending cut`
+              : `Initial reserve: ${fmt(results.emergencyFundInitial)} · Used during bear markets, replenished during bull years`}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 14 }}>
             {[
@@ -179,7 +188,7 @@ export default function ResultsSection({ results, seqRisk, stages }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#dcfce7" />
                 <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#9ca3af" }} label={{ value: "Year", position: "insideBottom", offset: -10, fontSize: 12, fill: "#9ca3af" }} />
                 <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
-                <Tooltip content={<EFTooltip />} />
+                <Tooltip content={<EFTooltip mode={results.emergencyFundMode} />} />
                 {results.stageEnds.map((se) => <ReferenceLine key={`ef-${se.x}`} x={se.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
                 <Area type="monotone" dataKey="p10" stackId="ef" fill="transparent" stroke="none" legendType="none" isAnimationActive={false} />
                 <Area type="monotone" dataKey="lo" stackId="ef" fill="#16a34a" fillOpacity={0.15} stroke="none" legendType="none" isAnimationActive={false} />
@@ -191,7 +200,9 @@ export default function ResultsSection({ results, seqRisk, stages }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: 12, color: "#6b7280" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 18, height: 2.5, background: "#15803d", display: "inline-block", borderRadius: 2 }} />Median balance</span>
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(22,163,74,.22)", display: "inline-block" }} />P10–P90 range</span>
-            <span style={{ color: "#9ca3af" }}>· zero = fund depleted · replenishes each bull year</span>
+            {results.emergencyFundMode === 'water_tank'
+              ? <span style={{ color: "#9ca3af" }}>· zero = tank depleted · refills via annual {results.emergencyFundContribRate}% portfolio contribution · floor prevents &gt;{results.emergencyFundFloorPct}% spending cuts</span>
+              : <span style={{ color: "#9ca3af" }}>· zero = fund depleted · replenishes each bull year</span>}
           </div>
         </div>
       )}

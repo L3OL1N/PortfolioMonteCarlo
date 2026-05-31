@@ -11,6 +11,17 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const maxAnnualWithdrawal = stages.reduce((max, st) => (st.cf < 0 ? Math.max(max, Math.abs(st.cf)) : max), 0);
   const efMax = efEnabled ? efYears * maxAnnualWithdrawal : 0;
 
+  // Water tank mode setup
+  const isWaterTank = efEnabled && emergencyFundConfig.mode === 'water_tank';
+  const wtContribRate = isWaterTank ? ((emergencyFundConfig.contributionRate || 4) / 100) : 0;
+  const wtFloorFactor = isWaterTank ? (1 - (emergencyFundConfig.floorPct || 5) / 100) : 0.95;
+  // Water tank only activates for the stage with the highest withdrawal amount
+  let maxWtStageIdx = -1;
+  if (isWaterTank) {
+    let maxWt = 0;
+    stages.forEach((st, i) => { if (st.cf < 0 && Math.abs(st.cf) > maxWt) { maxWt = Math.abs(st.cf); maxWtStageIdx = i; } });
+  }
+
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
   const withdrawalSums = Array(totalYears + 1).fill(0);
@@ -35,6 +46,7 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   for (let sim = 0; sim < numSims; sim++) {
     let yi = 0;
     let efBalance = efMax;
+    const lastSpendingBySim = isWaterTank ? stages.map(st => Math.abs(st.cf)) : null;
     const stagePrevShock = stages.map(() => new Array(numAssets).fill(0));
     const assetValues = ASSETS.map((asset) => initial * stages[0].alloc[asset.key]);
     yearVals[0][sim] = initial;
@@ -100,9 +112,25 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
             cashFlow = -finalSpending;
           }
 
-          // Use emergency fund during bear markets to avoid selling investments cheap
           let efUsedThisYear = 0;
-          if (efEnabled && cashFlow < 0 && isBear && efBalance > 0) {
+          let wtApplied = false;
+
+          if (isWaterTank && cashFlow < 0 && stIdx === maxWtStageIdx) {
+            // Water tank: portfolio contributes wtContribRate% each year → tank → spend tank/efYears with floor
+            const maxContrib = Math.max(0, efMax - efBalance);
+            const contribution = Math.min(totalAfter * wtContribRate, maxContrib);
+            efBalance += contribution;
+            const targetSpending = efYears > 0 ? efBalance / efYears : 0;
+            const floor = lastSpendingBySim[stIdx] * wtFloorFactor;
+            let spending = Math.max(targetSpending, floor);
+            spending = Math.min(spending, efBalance);
+            efBalance = Math.max(0, efBalance - spending);
+            lastSpendingBySim[stIdx] = spending;
+            efWithdrawalSums[yi] += spending;
+            cashFlow = -contribution;
+            wtApplied = true;
+          } else if (!isWaterTank && efEnabled && cashFlow < 0 && isBear && efBalance > 0) {
+            // Bear shield: use reserve during bear markets to avoid selling investments cheap
             const needed = Math.abs(cashFlow);
             efUsedThisYear = Math.min(needed, efBalance);
             efBalance -= efUsedThisYear;
@@ -110,11 +138,11 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
           }
 
           let adjustedTotal = Math.max(0, totalAfter + cashFlow);
-          withdrawalSums[yi] += Math.max(0, -cashFlow);
-          efWithdrawalSums[yi] += efUsedThisYear;
+          withdrawalSums[yi] += wtApplied ? 0 : Math.max(0, -cashFlow);
+          if (!wtApplied) efWithdrawalSums[yi] += efUsedThisYear;
 
-          // Replenish EF from portfolio during non-bear years (up to 0.5× max annual withdrawal per year)
-          if (efEnabled && !isBear && efBalance < efMax && maxAnnualWithdrawal > 0 && adjustedTotal > 0) {
+          // Replenish EF from portfolio during non-bear years (bear shield mode only)
+          if (!isWaterTank && efEnabled && !isBear && efBalance < efMax && maxAnnualWithdrawal > 0 && adjustedTotal > 0) {
             const replenish = Math.min(efMax - efBalance, maxAnnualWithdrawal * 0.5, adjustedTotal * 0.1);
             efBalance = Math.min(efMax, efBalance + replenish);
             adjustedTotal = Math.max(0, adjustedTotal - replenish);
@@ -276,6 +304,9 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     yearlyAssetP50Data,
     emergencyFundData,
     emergencyFundInitial: efMax,
+    emergencyFundMode: efEnabled ? (isWaterTank ? 'water_tank' : 'bear_shield') : null,
+    emergencyFundFloorPct: isWaterTank ? (emergencyFundConfig.floorPct || 5) : null,
+    emergencyFundContribRate: isWaterTank ? (emergencyFundConfig.contributionRate || 4) : null,
     success: ((yearVals[totalYears].filter((v) => v > 0).length / numSims) * 100).toFixed(1),
     ruinRate: ((ruinCount / numSims) * 100).toFixed(1),
     p10: pct(finalSorted, 0.10),
