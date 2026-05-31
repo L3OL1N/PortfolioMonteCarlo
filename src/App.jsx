@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { ASSETS, PRESETS } from "./constants";
-import { makeStage, makeCrash, allocTotal, allocAmountTotal, computeAllocFromAmounts } from "./utils";
+import { makeStage, makeCrash, allocTotal, allocAmountTotal, computeAllocFromAmounts, fmt } from "./utils";
 import { simulate } from "./simulation";
 import SequenceRiskPanel from "./components/SequenceRiskPanel";
 import PhaseSection from "./components/PhaseSection";
@@ -20,6 +20,7 @@ export default function App() {
   const [seqRisk, setSeqRisk] = useState({ autocorr: 0, crashes: [] });
   const [rebalance, setRebalance] = useState("annual");
   const [distribution, setDistribution] = useState("normal");
+  const [emergencyFund, setEmergencyFund] = useState({ enabled: false, years: 3, bearThreshold: -10 });
   const [results, setResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [seqOpen, setSeqOpen] = useState(true);
@@ -77,6 +78,9 @@ export default function App() {
     setSeqRisk({ autocorr: preset.autocorr, crashes: preset.crashes.map((crash) => ({ ...crash, id: Math.random().toString(36).slice(2) })) });
   };
 
+  const maxWithdrawalCf = stages.reduce((max, st) => (st.cf < 0 ? Math.max(max, Math.abs(st.cf)) : max), 0);
+  const emergencyFundInitial = emergencyFund.enabled ? emergencyFund.years * maxWithdrawalCf : 0;
+
   const allValid = stages.every((stage) => allocTotal(stage.alloc) === 100);
 
   const runSim = useCallback(() => {
@@ -88,7 +92,7 @@ export default function App() {
           ...stage,
           alloc: Object.fromEntries(Object.entries(stage.alloc).map(([key, value]) => [key, Number(value) / 100])),
         }));
-        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk, rebalance, distribution));
+        setResults(simulate(normedStages, initial, numSims, inflation / 100, seqRisk, rebalance, distribution, emergencyFund));
       } catch (error) {
         console.error(error);
       }
@@ -159,6 +163,46 @@ export default function App() {
         applyPreset={applyPreset}
         totalYrs={stages.reduce((sum, stage) => sum + stage.years, 0)}
       />
+
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.6 }}>Emergency Fund (緊急預備金)</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Draw from reserve during bear markets instead of selling investments</div>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+            <input type="checkbox" checked={emergencyFund.enabled} onChange={(e) => setEmergencyFund((prev) => ({ ...prev, enabled: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Enable</span>
+          </label>
+        </div>
+        {emergencyFund.enabled && (
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Reserve Years</div>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input type="number" value={emergencyFund.years} step={1} min={1} max={10}
+                  onChange={(e) => setEmergencyFund((prev) => ({ ...prev, years: Math.max(1, Math.min(10, Number(e.target.value))) }))}
+                  style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                <span style={{ fontSize: 14, color: "#6b7280" }}>yrs</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Bear Market Threshold</div>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <input type="number" value={emergencyFund.bearThreshold} step={1} min={-30} max={-1}
+                  onChange={(e) => setEmergencyFund((prev) => ({ ...prev, bearThreshold: Math.max(-30, Math.min(-1, Number(e.target.value))) }))}
+                  style={{ border: "none", background: "transparent", fontSize: 16, fontWeight: 700, outline: "none", color: "#111", width: "100%" }} />
+                <span style={{ fontSize: 14, color: "#6b7280" }}>%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Initial Fund Size</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d" }}>{fmt(emergencyFundInitial)}</div>
+              <div style={{ fontSize: 10, color: "#9ca3af" }}>{emergencyFund.years} yrs × {fmt(maxWithdrawalCf)}/yr</div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <PhaseSection
         stages={stages}

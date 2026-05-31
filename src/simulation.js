@@ -1,11 +1,20 @@
 import { ASSETS, COR } from "./constants";
 import { cholesky, portfolioMoments, randn, randStudentT } from "./utils";
 
-export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance = "annual", distribution = "normal") {
+export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance = "annual", distribution = "normal", emergencyFundConfig = { enabled: false, years: 3, bearThreshold: -10 }) {
   const { autocorr, crashes } = seqRisk;
+
+  // Emergency fund setup
+  const efEnabled = !!(emergencyFundConfig && emergencyFundConfig.enabled);
+  const efYears = efEnabled ? (emergencyFundConfig.years || 3) : 0;
+  const bearThreshold = efEnabled ? ((emergencyFundConfig.bearThreshold != null ? emergencyFundConfig.bearThreshold : -10) / 100) : -0.10;
+  const maxAnnualWithdrawal = stages.reduce((max, st) => (st.cf < 0 ? Math.max(max, Math.abs(st.cf)) : max), 0);
+  const efMax = efEnabled ? efYears * maxAnnualWithdrawal : 0;
+
   const totalYears = stages.reduce((s, st) => s + st.years, 0);
   const yearVals = Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0));
   const withdrawalSums = Array(totalYears + 1).fill(0);
+  const efWithdrawalSums = Array(totalYears + 1).fill(0);
   const year3AssetValues = Array.from({ length: ASSETS.length }, () => []);
   const year3AssetShares = Array.from({ length: ASSETS.length }, () => []);
   const finalAssetValues = Array.from({ length: ASSETS.length }, () => []);
@@ -17,15 +26,19 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
   const assetMeansReal = assetMeans.map((m) => (1 + m) / (1 + inflation) - 1);
   const numAssets = ASSETS.length;
   const rng = distribution === "fat" ? randStudentT : randn;
-  const yearlyAssetValues = Array.from({ length: totalYears + 1 }, () => 
+  const yearlyAssetValues = Array.from({ length: totalYears + 1 }, () =>
     Array.from({ length: numAssets }, () => [])
   );
 
+  const efVals = efEnabled ? Array.from({ length: totalYears + 1 }, () => new Array(numSims).fill(0)) : null;
+
   for (let sim = 0; sim < numSims; sim++) {
     let yi = 0;
+    let efBalance = efMax;
     const stagePrevShock = stages.map(() => new Array(numAssets).fill(0));
     const assetValues = ASSETS.map((asset) => initial * stages[0].alloc[asset.key]);
     yearVals[0][sim] = initial;
+    if (efEnabled && efVals) efVals[0][sim] = efBalance;
 
     const activeCrashes = {};
     const recoveryMap = {};
@@ -69,6 +82,11 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
           }
 
           const totalAfter = assetValues.reduce((sum, value) => sum + value, 0);
+
+          // Bear market detection: portfolio dropped below threshold this year
+          const portfolioReturn = totalBefore > 0 ? (totalAfter - totalBefore) / totalBefore : 0;
+          const isBear = efEnabled && (portfolioReturn < bearThreshold || !!activeCrashes[yi]);
+
           let cashFlow = stages[stIdx].cf;
           const withdrawalMode = stages[stIdx].withdrawalMode || "fixed";
           if (stages[stIdx].cf < 0 && withdrawalMode === "dynamic") {
@@ -81,8 +99,27 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
             finalSpending = Math.min(totalAfter, finalSpending);
             cashFlow = -finalSpending;
           }
-          const adjustedTotal = Math.max(0, totalAfter + cashFlow);
+
+          // Use emergency fund during bear markets to avoid selling investments cheap
+          let efUsedThisYear = 0;
+          if (efEnabled && cashFlow < 0 && isBear && efBalance > 0) {
+            const needed = Math.abs(cashFlow);
+            efUsedThisYear = Math.min(needed, efBalance);
+            efBalance -= efUsedThisYear;
+            cashFlow = -(needed - efUsedThisYear);
+          }
+
+          let adjustedTotal = Math.max(0, totalAfter + cashFlow);
           withdrawalSums[yi] += Math.max(0, -cashFlow);
+          efWithdrawalSums[yi] += efUsedThisYear;
+
+          // Replenish EF from portfolio during non-bear years (up to 0.5× max annual withdrawal per year)
+          if (efEnabled && !isBear && efBalance < efMax && maxAnnualWithdrawal > 0 && adjustedTotal > 0) {
+            const replenish = Math.min(efMax - efBalance, maxAnnualWithdrawal * 0.5, adjustedTotal * 0.1);
+            efBalance = Math.min(efMax, efBalance + replenish);
+            adjustedTotal = Math.max(0, adjustedTotal - replenish);
+          }
+
           const currentWeights = totalAfter > 0 ? assetValues.map((value) => value / totalAfter) : weights;
           if (rebalance === "annual") {
             assetValues.forEach((_, idx) => {
@@ -112,11 +149,14 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
         }
 
         yearVals[yi][sim] = assetValues.reduce((sum, value) => sum + value, 0);
-        
+
         // Collect yearly asset values for line chart
         assetValues.forEach((value, idx) => {
           yearlyAssetValues[yi][idx].push(value);
         });
+
+        // Track emergency fund balance per year
+        if (efEnabled && efVals) efVals[yi][sim] = efBalance;
       }
     }
   }
@@ -139,11 +179,31 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     };
   });
 
-  const withdrawalData = withdrawalSums.slice(1).map((sum, index) => ({
-    year: index + 1,
-    withdraw: Math.round(sum / numSims),
-    monthly: Math.round(sum / numSims / 12),
-  }));
+  const withdrawalData = withdrawalSums.slice(1).map((sum, index) => {
+    const ef = efWithdrawalSums[index + 1];
+    return {
+      year: index + 1,
+      withdraw: Math.round(sum / numSims),
+      monthly: Math.round((sum + ef) / numSims / 12),
+      efWithdraw: Math.round(ef / numSims),
+    };
+  });
+
+  // Emergency fund balance percentiles per year
+  let emergencyFundData = null;
+  if (efEnabled && efVals) {
+    emergencyFundData = efVals.map((vals, y) => {
+      const sorted = [...vals].sort((a, b) => a - b);
+      return {
+        year: y,
+        p10: Math.round(pct(sorted, 0.10)),
+        p25: Math.round(pct(sorted, 0.25)),
+        p50: Math.round(pct(sorted, 0.50)),
+        p75: Math.round(pct(sorted, 0.75)),
+        p90: Math.round(pct(sorted, 0.90)),
+      };
+    });
+  }
 
   const stageEnds = [];
   let cum = 0;
@@ -214,6 +274,8 @@ export function simulate(stages, initial, numSims, inflation, seqRisk, rebalance
     year3AssetSummary,
     finalAssetSummary,
     yearlyAssetP50Data,
+    emergencyFundData,
+    emergencyFundInitial: efMax,
     success: ((yearVals[totalYears].filter((v) => v > 0).length / numSims) * 100).toFixed(1),
     ruinRate: ((ruinCount / numSims) * 100).toFixed(1),
     p10: pct(finalSorted, 0.10),

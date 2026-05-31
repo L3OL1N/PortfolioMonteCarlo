@@ -7,17 +7,44 @@ function WithdrawalTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   if (!d) return null;
+  const hasEF = d.efWithdraw > 0;
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year}</div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
-        <span>Yearly withdrawal</span>
+        <span>Portfolio withdrawal</span>
         <span style={{ fontWeight: 700 }}>{fmt(d.withdraw)}</span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
-        <span>Monthly amount</span>
+      {hasEF && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8, color: "#15803d" }}>
+          <span>From emergency fund</span>
+          <span style={{ fontWeight: 700 }}>{fmt(d.efWithdraw)}</span>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8, borderTop: hasEF ? "1px solid #e5e7eb" : "none", paddingTop: hasEF ? 4 : 0 }}>
+        <span>Monthly total</span>
         <span style={{ fontWeight: 700 }}>{fmt(d.monthly)}</span>
+      </div>
+    </div>
+  );
+}
+
+function EFTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>Year {d.year} — Emergency Fund</div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+        <span>P10 (worst)</span><span style={{ fontWeight: 700, color: "#dc2626" }}>{fmt(d.p10)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+        <span>Median (P50)</span><span style={{ fontWeight: 700, color: "#15803d" }}>{fmt(d.p50)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 20, lineHeight: 1.8 }}>
+        <span>P90 (best)</span><span style={{ fontWeight: 700, color: "#15803d" }}>{fmt(d.p90)}</span>
       </div>
     </div>
   );
@@ -119,11 +146,55 @@ export default function ResultsSection({ results, seqRisk, stages }) {
               <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
               <Tooltip content={<WithdrawalTooltip />} />
               {results.stageEnds.map((stageEnd) => <ReferenceLine key={`wd-${stageEnd.x}`} x={stageEnd.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
-              <Bar dataKey="withdraw" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="efWithdraw" stackId="w" fill="#16a34a" radius={[0, 0, 0, 0]} name="Emergency Fund" />
+              <Bar dataKey="withdraw" stackId="w" fill="#1d4ed8" radius={[8, 8, 0, 0]} name="Portfolio" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
+
+      {results.emergencyFundData && (
+        <div style={{ marginTop: 22, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "18px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Emergency Fund Balance (緊急預備金)</div>
+          <div style={{ fontSize: 12, color: "#16a34a", marginBottom: 12 }}>
+            Initial reserve: {fmt(results.emergencyFundInitial)} · Used during bear markets, replenished during bull years
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 14 }}>
+            {[
+              { label: "Initial Size", val: fmt(results.emergencyFundInitial), c: "#15803d", bg: "#fff" },
+              { label: `P50 at Yr ${Math.min(10, results.emergencyFundData.length - 1)}`, val: fmt(results.emergencyFundData[Math.min(10, results.emergencyFundData.length - 1)]?.p50 || 0), c: "#15803d", bg: "#fff" },
+              { label: "P10 at Final Year", val: fmt(results.emergencyFundData[results.emergencyFundData.length - 1]?.p10 || 0), c: "#b91c1c", bg: "#fff" },
+            ].map(({ label, val, c, bg }) => (
+              <div key={label} style={{ background: bg, border: "1px solid #bbf7d0", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2, fontWeight: 600 }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: c }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ width: "100%", height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={results.emergencyFundData.map((d) => ({ ...d, lo: Math.max(0, d.p50 - d.p10), hi: Math.max(0, d.p90 - d.p50) }))}
+                margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#dcfce7" />
+                <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#9ca3af" }} label={{ value: "Year", position: "insideBottom", offset: -10, fontSize: 12, fill: "#9ca3af" }} />
+                <YAxis tickFormatter={fmt} tick={{ fontSize: 11, fill: "#9ca3af" }} width={72} />
+                <Tooltip content={<EFTooltip />} />
+                {results.stageEnds.map((se) => <ReferenceLine key={`ef-${se.x}`} x={se.x} stroke="#9ca3af" strokeDasharray="5 4" />)}
+                <Area type="monotone" dataKey="p10" stackId="ef" fill="transparent" stroke="none" legendType="none" isAnimationActive={false} />
+                <Area type="monotone" dataKey="lo" stackId="ef" fill="#16a34a" fillOpacity={0.15} stroke="none" legendType="none" isAnimationActive={false} />
+                <Area type="monotone" dataKey="hi" stackId="ef" fill="#16a34a" fillOpacity={0.28} stroke="none" legendType="none" isAnimationActive={false} />
+                <Line type="monotone" dataKey="p50" stroke="#15803d" strokeWidth={2.5} dot={false} legendType="none" isAnimationActive={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 18, height: 2.5, background: "#15803d", display: "inline-block", borderRadius: 2 }} />Median balance</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(22,163,74,.22)", display: "inline-block" }} />P10–P90 range</span>
+            <span style={{ color: "#9ca3af" }}>· zero = fund depleted · replenishes each bull year</span>
+          </div>
+        </div>
+      )}
 
       {(seqRisk.autocorr > 0 || seqRisk.crashes.length > 0) && (
         <div style={{ marginTop: 14, padding: "12px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, fontSize: 12, color: "#78350f" }}>
